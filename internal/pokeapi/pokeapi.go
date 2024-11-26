@@ -3,27 +3,47 @@ package pokeapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/timpinoy/waepokego/internal/pokecache"
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
-type PokeAPILocationAreas struct {
-	Count    int     `json:"count"`
-	Next     *string `json:"next"`
-	Previous *string `json:"previous"`
-	Results  []struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	} `json:"results"`
+const baseURL string = "https://pokeapi.co/api/v2"
+
+type Client struct {
+	cache *pokecache.Cache
 }
 
-func GetLocationAreas(url string) (PokeAPILocationAreas, error) {
-	res, err := http.Get(url)
+func NewClient() *Client {
+	return &Client{
+		cache: pokecache.NewCache(time.Second * 30),
+	}
+}
+
+func (c *Client) GetLocationAreas(url *string) (PokeAPILocationAreas, error) {
+	locationAreas := PokeAPILocationAreas{}
+	queryURL := baseURL + "/location-area"
+	if url != nil {
+		queryURL = *url
+	}
+
+	data, ok := c.cache.Get(queryURL)
+	if ok {
+		fmt.Println("Using cache...")
+		err := json.Unmarshal(data, &locationAreas)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return locationAreas, nil
+	}
+
+	res, err := http.Get(queryURL)
 	if err != nil {
 		return PokeAPILocationAreas{}, fmt.Errorf("Error during GET: %v", err)
 	}
-	data, err := io.ReadAll(res.Body)
+	data, err = io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if res.StatusCode > 299 {
 		log.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, data)
@@ -31,10 +51,13 @@ func GetLocationAreas(url string) (PokeAPILocationAreas, error) {
 	if err != nil {
 		return PokeAPILocationAreas{}, fmt.Errorf("Error during response read: %v", err)
 	}
-	locationAreas := PokeAPILocationAreas{}
+
 	err = json.Unmarshal(data, &locationAreas)
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	c.cache.Add(queryURL, data)
+
 	return locationAreas, nil
 }
