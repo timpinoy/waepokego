@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/timpinoy/waepokego/internal/pokeapi"
+	"github.com/timpinoy/waepokego/internal/pokedex"
 	"os"
+	"strings"
 )
 
-const basePokeAPIUrl string = "https://pokeapi.co/api/v2/"
-
-func NewConfig(client *pokeapi.Client) cliCommandConfig {
+func NewConfig(client *pokeapi.Client, dex *pokedex.Pokedex) cliCommandConfig {
 	return cliCommandConfig{
-		Client: client,
+		Client:  client,
+		Pokedex: dex,
 	}
 }
 
@@ -21,8 +22,9 @@ func runREPL(config cliCommandConfig) {
 		fmt.Print("pokedex > ")
 		scanner.Scan()
 		userInput := scanner.Text()
-		if command, ok := getCliCommands()[userInput]; ok {
-			err := command.callback(&config)
+		words := strings.Fields(strings.ToLower(userInput))
+		if command, ok := getCliCommands()[words[0]]; ok {
+			err := command.callback(&config, words[1:])
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -39,13 +41,14 @@ func runREPL(config cliCommandConfig) {
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(config *cliCommandConfig) error
+	callback    func(config *cliCommandConfig, params []string) error
 }
 
 type cliCommandConfig struct {
 	Previous *string
 	Next     *string
 	Client   *pokeapi.Client
+	Pokedex  *pokedex.Pokedex
 }
 
 func getCliCommands() map[string]cliCommand {
@@ -69,6 +72,26 @@ func getCliCommands() map[string]cliCommand {
 			name:        "mapb",
 			description: "Displays the previous set of map locations",
 			callback:    commandMapb,
+		},
+		"explore": {
+			name:        "explore",
+			description: "Displays the pokemon in a given area (name)",
+			callback:    commandExplore,
+		},
+		"catch": {
+			name:        "catch",
+			description: "Attempts to catch the given pokemon (name)",
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "Displays the details of the given pokemon (name)",
+			callback:    commandInspect,
+		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "Displays all the pokemon in the pokedex",
+			callback:    commandPokedex,
 		},
 	}
 }
